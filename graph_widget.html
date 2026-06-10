@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Directed Graph Visualizer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f4f0; color: #1a1a1a; padding: 1.5rem; }
+    h1 { font-size: 18px; margin-bottom: 1rem; }
+    .row { display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+    .panel { flex: 1; min-width: 240px; }
+    label { font-size: 13px; color: #555; display: block; margin-bottom: 6px; }
+    textarea { width: 100%; height: 160px; font-family: monospace; font-size: 13px; resize: vertical; border: 1px solid #ccc; border-radius: 6px; padding: 8px; }
+    #canvas-wrap { flex: 2; min-width: 300px; border: 1px solid #ddd; border-radius: 10px; overflow: hidden; background: #fff; }
+    svg { display: block; }
+    #err { font-size: 12px; color: #c0392b; margin-top: 6px; min-height: 16px; }
+    .btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    button { font-size: 13px; padding: 6px 14px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; }
+    button:hover { background: #f0f0f0; }
+    .format-hint { font-size: 11px; color: #888; margin-top: 4px; }
+    .tab-row { display: flex; gap: 0; margin-bottom: 8px; }
+    .tab { font-size: 12px; padding: 5px 14px; cursor: pointer; border: 1px solid #ccc; background: #f0f0f0; }
+    .tab:first-child { border-radius: 6px 0 0 6px; }
+    .tab:last-child { border-radius: 0 6px 6px 0; }
+    .tab.active { background: #5b54d6; color: white; border-color: #5b54d6; }
+    .file-drop { border: 2px dashed #ccc; border-radius: 8px; padding: 24px 12px; text-align: center; cursor: pointer; font-size: 13px; color: #777; transition: border-color 0.15s, background 0.15s; }
+    .file-drop:hover, .file-drop.over { border-color: #5b54d6; background: #f3f2ff; }
+    .file-drop input { display: none; }
+    #file-name { font-size: 11px; color: #888; margin-top: 6px; }
+    code { font-family: monospace; background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>Directed Graph Visualizer</h1>
+  <div class="row">
+    <div class="panel">
+      <div class="tab-row">
+        <div class="tab active" onclick="setMode('grid')" id="tab-grid">Grid / CSV</div>
+        <div class="tab" onclick="setMode('json')" id="tab-json">JSON</div>
+        <div class="tab" onclick="setMode('file')" id="tab-file">File</div>
+      </div>
+
+      <div id="input-grid">
+        <label>Rows comma- or space-separated, one per line</label>
+        <textarea id="matrix-grid">0, 1, 0, 0
+0, 0, 1, 1
+1, 0, 0, 1
+0, 0, 0, 0</textarea>
+        <div class="format-hint">Accepts 0/1 or weighted values.</div>
+      </div>
+
+      <div id="input-json" style="display:none">
+        <label>JSON array-of-arrays — paste output of <code>json.dumps(matrix.toarray().tolist())</code></label>
+        <textarea id="matrix-json">[[0,1,0,0],[0,0,1,1],[1,0,0,1],[0,0,0,0]]</textarea>
+        <div class="format-hint">Paste the Python output directly.</div>
+      </div>
+
+      <div id="input-file" style="display:none">
+        <label>Drop or select a file</label>
+        <div class="file-drop" id="drop-zone" onclick="document.getElementById('file-input').click()">
+          <input type="file" id="file-input" accept=".csv,.json,.txt,.mtx">
+          📂 Click to browse or drag &amp; drop
+        </div>
+        <div id="file-name"></div>
+        <div class="format-hint" style="margin-top:8px">
+          Supports <code>.mtx</code> (Matrix Market), <code>.json</code> (nested array), <code>.csv</code> / <code>.txt</code> (row-per-line).
+        </div>
+      </div>
+
+      <div id="err"></div>
+      <div class="btn-row">
+        <button onclick="draw()">Draw ↗</button>
+        <button onclick="layoutCircle()">Circle</button>
+        <button onclick="layoutForce()">Force</button>
+        <button onclick="exportJPG()">Export JPG</button>
+      </div>
+    </div>
+    <div id="canvas-wrap" style="height:480px">
+      <svg id="svg" width="100%" height="480"></svg>
+    </div>
+  </div>
+
+<script>
+const W = () => document.getElementById('svg').clientWidth || 600;
+const H = 480;
+let nodes = [], edges = [], positions = [], dragging = null, dragOff = {x:0,y:0};
+let mode = 'grid';
+let fileMatrix = null;
+
+function setMode(m) {
+  mode = m;
+  ['grid','json','file'].forEach(id => {
+    document.getElementById('input-' + id).style.display = id === m ? '' : 'none';
+    document.getElementById('tab-' + id).classList.toggle('active', id === m);
+  });
+  draw();
+}
+
+function validateMatrix(mat) {
+  if (!Array.isArray(mat) || !Array.isArray(mat[0])) throw new Error('Expected a 2D array.');
+  const n = mat.length;
+  for (let r of mat) if (r.length !== n) throw new Error(`Row length mismatch (expected ${n})`);
+  return mat;
+}
+
+function parseMTX(text) {
+  const lines = text.split('\n');
+  let headerParsed = false;
+  let rows, cols, mat = null;
+  let isPattern = false;
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
+    if (line.startsWith('%%MatrixMarket')) { isPattern = line.toLowerCase().includes('pattern'); continue; }
+    if (line.startsWith('%')) continue;
+    const nums = line.split(/\s+/).map(Number);
+    if (!headerParsed) {
+      rows = nums[0]; cols = nums[1];
+      if (rows !== cols) throw new Error(`MTX matrix is not square (${rows}x${cols})`);
+      mat = Array.from({length: rows}, () => Array(cols).fill(0));
+      headerParsed = true;
+      continue;
+    }
+    const r = nums[0]-1, c = nums[1]-1;
+    const val = isPattern ? 1 : (nums[2] !== undefined ? nums[2] : 1);
+    if (r >= 0 && r < rows && c >= 0 && c < cols) mat[r][c] = val;
+  }
+  if (!mat) throw new Error('Could not parse MTX file.');
+  return mat;
+}
+
+function parseFileContent(text, filename) {
+  const name = filename.toLowerCase();
+  if (name.endsWith('.mtx')) return parseMTX(text);
+  if (name.endsWith('.json')) return validateMatrix(JSON.parse(text));
+  const rows = text.trim().split('\n').map(r => r.trim()).filter(Boolean);
+  return validateMatrix(rows.map(r => r.split(/[\s,\t]+/).map(Number)));
+}
+
+function parseMatrix() {
+  if (mode === 'json') return validateMatrix(JSON.parse(document.getElementById('matrix-json').value.trim()));
+  if (mode === 'file') { if (!fileMatrix) throw new Error('No file loaded yet.'); return fileMatrix; }
+  const rows = document.getElementById('matrix-grid').value.trim().split('\n').map(r => r.trim()).filter(Boolean);
+  return validateMatrix(rows.map(r => r.split(/[\s,]+/).map(Number)));
+}
+
+function handleFile(file) {
+  if (!file) return;
+  document.getElementById('file-name').textContent = '📄 ' + file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try { fileMatrix = parseFileContent(e.target.result, file.name); document.getElementById('err').textContent = ''; draw(); }
+    catch(err) { document.getElementById('err').textContent = err.message; }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('over'); handleFile(e.dataTransfer.files[0]); });
+
+function layoutCircle() {
+  const n = nodes.length, cx = W()/2, cy = H/2, r = Math.min(W(), H) * 0.35;
+  positions = nodes.map((_, i) => ({x: cx + r*Math.cos((2*Math.PI*i/n)-Math.PI/2), y: cy + r*Math.sin((2*Math.PI*i/n)-Math.PI/2)}));
+  render();
+}
+
+function layoutForce() {
+  const n = nodes.length;
+  if (!positions.length) layoutCircle();
+  let pos = positions.map(p => ({x:p.x, y:p.y, vx:0, vy:0}));
+  const cx = W()/2, cy = H/2;
+  for (let iter = 0; iter < 300; iter++) {
+    for (let i = 0; i < n; i++) {
+      let fx=(cx-pos[i].x)*0.01, fy=(cy-pos[i].y)*0.01;
+      for (let j = 0; j < n; j++) {
+        if (i===j) continue;
+        const dx=pos[i].x-pos[j].x, dy=pos[i].y-pos[j].y, d=Math.sqrt(dx*dx+dy*dy)||1;
+        fx+=dx/d*2800/(d*d); fy+=dy/d*2800/(d*d);
+        if (edges.some(e=>(e.from===i&&e.to===j)||(e.from===j&&e.to===i))) { const diff=d-120; fx-=dx/d*diff*0.04; fy-=dy/d*diff*0.04; }
+      }
+      pos[i].vx=(pos[i].vx+fx)*0.6; pos[i].vy=(pos[i].vy+fy)*0.6;
+    }
+    for (let i=0;i<n;i++) { pos[i].x=Math.max(30,Math.min(W()-30,pos[i].x+pos[i].vx)); pos[i].y=Math.max(30,Math.min(H-30,pos[i].y+pos[i].vy)); }
+  }
+  positions=pos; render();
+}
+
+function draw() {
+  document.getElementById('err').textContent = '';
+  try {
+    const mat = parseMatrix(), n = mat.length;
+    nodes = Array.from({length:n},(_,i)=>i); edges = [];
+    for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (mat[i][j]) edges.push({from:i,to:j,w:mat[i][j]});
+    layoutCircle(); setTimeout(layoutForce, 50);
+  } catch(e) { document.getElementById('err').textContent = e.message; }
+}
+
+const NODE_R=22;
+const NODE_COLOR='#EEEDFE',NODE_BORDER='#7F77DD',NODE_TEXT='#26215C';
+const EDGE_COLOR='#0F6E56',SELF_COLOR='#993C1D',LABEL_BG='#E1F5EE',LABEL_TXT='#085041',BG_COLOR='#f5f4f0';
+
+function arrowPoints(x1,y1,x2,y2){const dx=x2-x1,dy=y2-y1,d=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/d,uy=dy/d;return{sx:x1+ux*NODE_R,sy:y1+uy*NODE_R,ex:x2-ux*(NODE_R+2),ey:y2-uy*(NODE_R+2)};}
+function selfLoopPath(cx,cy){const r=NODE_R,lx=cx-r*0.3,ty=cy-r;return`M ${lx} ${ty} C ${lx-36} ${ty-36} ${lx+36+r*0.6} ${ty-36} ${cx+r*0.3} ${ty}`;}
+
+function buildSVGInner(forExport){
+  const w=W();
+  let defs=`<defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="${EDGE_COLOR}"/></marker><marker id="arr-self" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="${SELF_COLOR}"/></marker></defs>`;
+  let bg=forExport?`<rect width="${w}" height="${H}" fill="${BG_COLOR}"/>`:'';
+  let edgeSVG='',nodeSVG='';
+  for (const e of edges){
+    if(e.from===e.to){
+      const{x,y}=positions[e.from];
+      edgeSVG+=`<path d="${selfLoopPath(x,y)}" fill="none" stroke="${SELF_COLOR}" stroke-width="1.5" marker-end="url(#arr-self)" opacity="0.85"/>`;
+      if(e.w!==1) edgeSVG+=`<text x="${x-NODE_R-18}" y="${y-NODE_R-8}" font-size="11" fill="${SELF_COLOR}" text-anchor="middle">${e.w}</text>`;
+    } else {
+      const p1=positions[e.from],p2=positions[e.to],a=arrowPoints(p1.x,p1.y,p2.x,p2.y);
+      const hasBoth=edges.some(f=>f.from===e.to&&f.to===e.from);
+      let d;
+      if(hasBoth){const mx=(a.sx+a.ex)/2,my=(a.sy+a.ey)/2,dx=a.ex-a.sx,dy=a.ey-a.sy,len=Math.sqrt(dx*dx+dy*dy)||1;d=`M ${a.sx} ${a.sy} Q ${mx-dy/len*18} ${my+dx/len*18} ${a.ex} ${a.ey}`;}
+      else{d=`M ${a.sx} ${a.sy} L ${a.ex} ${a.ey}`;}
+      edgeSVG+=`<path d="${d}" fill="none" stroke="${EDGE_COLOR}" stroke-width="1.5" marker-end="url(#arr)" opacity="0.85"/>`;
+      if(e.w!==1){const mx=(a.sx+a.ex)/2,my=(a.sy+a.ey)/2;edgeSVG+=`<rect x="${mx-10}" y="${my-9}" width="20" height="14" rx="3" fill="${LABEL_BG}"/><text x="${mx}" y="${my+2}" font-size="11" fill="${LABEL_TXT}" text-anchor="middle" font-weight="500">${e.w}</text>`;}
+    }
+  }
+  for(let i=0;i<nodes.length;i++){
+    const{x,y}=positions[i];
+    const attrs=!forExport?`class="node-g" data-i="${i}" style="cursor:grab"`:'';
+    nodeSVG+=`<g ${attrs}><circle cx="${x}" cy="${y}" r="${NODE_R}" fill="${NODE_COLOR}" stroke="${NODE_BORDER}" stroke-width="1.5"/><text x="${x}" y="${y+5}" font-size="13" fill="${NODE_TEXT}" text-anchor="middle" font-weight="500" font-family="sans-serif">${i+1}</text></g>`;
+  }
+  return{defs,bg,edgeSVG,nodeSVG};
+}
+
+function render(){
+  const svg=document.getElementById('svg');
+  const{defs,edgeSVG,nodeSVG}=buildSVGInner(false);
+  svg.innerHTML=defs+edgeSVG+nodeSVG;
+  svg.querySelectorAll('.node-g').forEach(g=>{
+    g.addEventListener('mousedown',e=>{
+      dragging=parseInt(g.dataset.i);
+      const rect=svg.getBoundingClientRect();
+      dragOff={x:e.clientX-rect.left-positions[dragging].x,y:e.clientY-rect.top-positions[dragging].y};
+      e.preventDefault();
+    });
+  });
+}
+
+function exportJPG(){
+  const svgEl=document.getElementById('svg'),w=svgEl.clientWidth||600;
+  const{defs,bg,edgeSVG,nodeSVG}=buildSVGInner(true);
+  const svgStr=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${H}" viewBox="0 0 ${w} ${H}">${defs}${bg}${edgeSVG}${nodeSVG}</svg>`;
+  const blob=new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const img=new Image();
+  img.onload=()=>{
+    const canvas=document.createElement('canvas');
+    canvas.width=w*2;canvas.height=H*2;
+    const ctx=canvas.getContext('2d');
+    ctx.scale(2,2);ctx.fillStyle=BG_COLOR;ctx.fillRect(0,0,w,H);ctx.drawImage(img,0,0,w,H);
+    URL.revokeObjectURL(url);
+    const a=document.createElement('a');a.download='graph.jpg';a.href=canvas.toDataURL('image/jpeg',0.95);a.click();
+  };
+  img.src=url;
+}
+
+document.getElementById('svg').addEventListener('mousemove',e=>{
+  if(dragging===null)return;
+  const rect=document.getElementById('svg').getBoundingClientRect();
+  positions[dragging]={x:e.clientX-rect.left-dragOff.x,y:e.clientY-rect.top-dragOff.y};
+  render();
+});
+document.addEventListener('mouseup',()=>{dragging=null;});
+document.getElementById('matrix-grid').addEventListener('input',draw);
+document.getElementById('matrix-json').addEventListener('input',draw);
+
+draw();
+</script>
+</body>
+</html>
