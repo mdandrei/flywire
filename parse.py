@@ -12,7 +12,7 @@ try:
 	_initialized
 except NameError:
 
-	print("here")
+	print("Init section: do once")
 
 # long index sets: 2
 	d = pd.read_csv("../banc_626_edge_list.csv")
@@ -44,37 +44,7 @@ except NameError:
 	c.rename(columns={"source neuron id":"sn"}, inplace=True)
 	c["setValue"]= c.index*0+3
 
-
-#####################
-	aNbNc = pd.concat( [a, b, c ] )
 	_initialized=True
-
-#
-# logic gate 1: only keep directed edges which are in all 3 - short-index-name - data sets
-# 
-# After this step duplication accross all 3 is not guaranteed: just any duplication ( including within a single set, or only 2 set, or the desired all 3 )
-#
-L10 = aNbNc[aNbNc.duplicated(subset=['sn','tn'], keep=False )]
-
-# Now for each [sn,tn] repeat count how many distinct sets it belongs too
-distinct_setValues = L10.groupby(['sn', 'tn'])['setValue'].transform('nunique') # nunique == number of unique setValue-s in a group where [sn,tn] match
-
-#
-L11 = L10[ distinct_setValues == 3 ]
-
-# these are the same
-L2 = L11[ L11.setValue == 1 ].copy();
-
-# identify unique neuron numbers either as source, or target and index them sequentially 1 and up
-unique_vals = pd.unique( pd.concat( [L2[["sn","tn"]]] ).values.ravel() )
-mapping     = { val: i+1 for i, val in enumerate(unique_vals) }
-
-
-L2["snX"] = -1;
-L2["tnX"] = -1;
-L2["snX"] = L2a["sn"].map(mapping)
-L2["tnX"] = L2a["tn"].map(mapping)
-
 
 #
 # form a symmetric ( i.e. weak ) connection matrix and return mat index to neuron forward and reverse correspondence
@@ -94,7 +64,6 @@ def df_to_sparse(df, source_col, target_col):
         matrix[i, j] = 1
     
     return matrix, node_index, rnode_index
-
 
 
 def isolate_islands(matrix, rnode_index):
@@ -148,10 +117,38 @@ def islandingSingle():
 	return -1
 
 
+def isomorphismCheck():
 
-#### Approach 1
+	return -1
+
+
+
+##################### Approach 1: m* only repeats: label and structure identical in coincident subgraphs
+aNbNc = pd.concat( [a, b, c ] )
+
+# logic gate 1: only keep directed edges which are in all 3 - short-index-name - data sets
+# After this step duplication accross all 3 is not guaranteed: just any duplication ( including within a single set, or only 2 set, or the desired all 3 )
+L10 = aNbNc[aNbNc.duplicated(subset=['sn','tn'], keep=False )]
+
+# Now for each [sn,tn] repeat count how many distinct sets it belongs too
+distinct_setValues = L10.groupby(['sn', 'tn'])['setValue'].transform('nunique') # nunique == number of unique setValue-s in a group where [sn,tn] match
+
+L11 = L10[ distinct_setValues == 3 ]
+L2  = L11[ L11.setValue == 1 ].copy();
+
+# identify unique neuron numbers either as source, or target and index them sequentially 1 and up
+unique_vals = pd.unique( pd.concat( [L2[["sn","tn"]]] ).values.ravel() )
+mapping     = { val: i+1 for i, val in enumerate(unique_vals) }
+
+# dont actually need this
+L2["snX"] = -1;
+L2["tnX"] = -1;
+L2["snX"] = L2a["sn"].map(mapping)
+L2["tnX"] = L2a["tn"].map(mapping)
+
+##################### Approach 1
 mat, ni, rni = df_to_sparse(L2, "sn", "tn" )
 nset, niseq, Mcs = isolate_islands(mat, rni );
 
 
-### Approach 2
+### Approach 2: m* and f* repeats via isomorphism checks: only structure is guaranteed to be identical 
