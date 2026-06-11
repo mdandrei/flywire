@@ -93,23 +93,23 @@ Deliverables
 Solution File
 Submit a CSV file containing:
 
-Three columns, corresponding to the selected datasets.
+> </mark> Three columns, corresponding to the selected datasets. </mark>
 
-N rows, corresponding to matched neurons across datasets.
+> N rows, corresponding to matched neurons across datasets.
 
-Each row should contain the neuron identifiers that participate in the identified correspondence.
+> Each row should contain the neuron identifiers that participate in the identified correspondence.
 
 
 Optimization Objective
 Maximize N, subject to the following constraints:
 
-The induced directed connectivity structure must be identical across all three datasets.
 
-If an edge exists between two matched neurons in one dataset, the corresponding edge must exist in the others.
+> The induced directed connectivity structure must be identical across all three datasets.
 
-Edge directionality must be preserved.
+> If an edge exists between two matched neurons in one dataset, the corresponding edge must exist in the others.
 
-In other words, the correspondence must define mutually isomorphic directed induced subgraphs.
+> Edge directionality must be preserved.
+  In other words, the correspondence must define mutually isomorphic directed induced subgraphs.
 
 
 
