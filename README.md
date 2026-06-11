@@ -1,4 +1,52 @@
-On Tue, Jun 2, 2026 at 5:17 PM FlyWire Codex <flywirecodex@gmail.com> wrote:
+
+
+
+
+---
+### Notes 06-10-2026
+
+Questions/observations as of 06-10-2026
+
+1) Do distinct individuals of the same sex share connectome topology, or parts of. This is addressed in the 1st approach in parse.py for m* data sets
+
+*** TODO
+2) Same question for individuals of opposite sex: ... this is the reindexed graph isomorphism problem 
+
+
+3) The three unisex sets M* are expected to have shared subgraph/circuits as these describe different, but adjacent anatomical 
+parts of the nervous system of the fly: e.g. nerve cord ( manc ), optic lobe ( maol ), cns ( mcns )
+
+
+---
+###  June 8th assignment update
+
+Dear Applicants,
+
+Thank you for your continued engagement with the qualification challenge. Following several inquiries, we have a few important updates and clarifications:
+
+1. Extended Deadline: The submission deadline has been extended to June 12th, 11:59 PM EST.
+
+2. Connectivity Requirement: The discovered isomorphic structures must be weakly connected.
+
+3. Brain Region Clarification: There is no requirement that matched neurons come from the same brain regions across the 3 datasets, as this information was not provided in the data.
+
+4. Resubmissions: If you have already submitted and would like to update your solution, simply update your GitHub repository. We will download all solutions from the provided links shortly after the deadline.
+
+As a reminder, please submit your materials via the forms below:
+
+  • Submission Form: https://docs.google.com/forms/d/1tkUWhqUz_SW_q9Wfo9DIpzi7Hp4MyUjrayKAvEDZYJ4
+  • Inquiry Form: https://docs.google.com/forms/d/1oCHwF3ivVch_tGhOuVFVOWq0BDlMcngrZXtC2TVRCyQ
+
+If you have any further questions, please use the inquiry form above.
+
+Best regards,
+The FlyWire Team
+
+
+---
+### Assignment
+
+ Tue, Jun 2, 2026 at 5:17 PM FlyWire Codex <flywirecodex@gmail.com> wrote:
 Dear Applicants,
 
 
@@ -130,28 +178,3 @@ The FlyWire Team
  One attachment
   •  Scanned by Gmail
 
-
-
-==================== June 8th update
-
-Dear Applicants,
-
-Thank you for your continued engagement with the qualification challenge. Following several inquiries, we have a few important updates and clarifications:
-
-1. Extended Deadline: The submission deadline has been extended to June 12th, 11:59 PM EST.
-
-2. Connectivity Requirement: The discovered isomorphic structures must be weakly connected.
-
-3. Brain Region Clarification: There is no requirement that matched neurons come from the same brain regions across the 3 datasets, as this information was not provided in the data.
-
-4. Resubmissions: If you have already submitted and would like to update your solution, simply update your GitHub repository. We will download all solutions from the provided links shortly after the deadline.
-
-As a reminder, please submit your materials via the forms below:
-
-  • Submission Form: https://docs.google.com/forms/d/1tkUWhqUz_SW_q9Wfo9DIpzi7Hp4MyUjrayKAvEDZYJ4
-  • Inquiry Form: https://docs.google.com/forms/d/1oCHwF3ivVch_tGhOuVFVOWq0BDlMcngrZXtC2TVRCyQ
-
-If you have any further questions, please use the inquiry form above.
-
-Best regards,
-The FlyWire Team

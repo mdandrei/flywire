@@ -1,13 +1,16 @@
 
+import pandas as pd
+import numpy as np
+
+from scipy.sparse import csr_matrix, csc_matrix, lil_matrix, coo_matrix # coo_matrix == coordinate labeled matrix
+from scipy.sparse.csgraph import connected_components
+
+import networkx as nx
+
 
 try:
 	_initialized
 except NameError:
-	import pandas as pd
-	from scipy.sparse import csr_matrix, csc_matrix, lil_matrix, coo_matrix
-	import numpy as np
-	from scipy.sparse import csr_matrix
-	from scipy.sparse.csgraph import connected_components
 
 	print("here")
 
@@ -140,5 +143,15 @@ def isolate_islands(matrix, rnode_index):
 ## need to return the island verteces referred to the original neuron index
 
 
+def islandingSingle():
+
+	return -1
+
+
+
+#### Approach 1
 mat, ni, rni = df_to_sparse(L2, "sn", "tn" )
 nset, niseq, Mcs = isolate_islands(mat, rni );
+
+
+### Approach 2

@@ -40,6 +40,9 @@ nc2, labels2 = connected_components(
 
 
 def pp( M ):
+	"""
+	matrix to a graph plottable matrix ( no ,  no [] )
+	"""
 	arr = M.toarray()
 	for row in arr:
 		print(' '.join(map(str, row)))
