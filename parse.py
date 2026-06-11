@@ -9,21 +9,27 @@ import networkx as nx
 
 
 try:
-	_initialized
+	#_initialized
+	_forceInit
 except NameError:
 
 	print("Init section: do once")
+
+	rsets = { "banc":"d", "fafb":"e", "manc":"a", "maol":"b", "mcns":"c" }
+	sets  = { "a":"manc", "b":"maol", "c":"mcns", "d":"banc", "e":"fafb" }
 
 # long index sets: 2
 	d = pd.read_csv("../banc_626_edge_list.csv")
 	d.rename(columns={"target neuron id":"tn"}, inplace=True)
 	d.rename(columns={"source neuron id":"sn"}, inplace=True)
 	d["setValue"]= d.index*0+4
+	d["setName"] = "banc"
 
 	e = pd.read_csv("../fafb_783_edge_list.csv")
 	e.rename(columns={"target neuron id":"tn"}, inplace=True)
 	e.rename(columns={"source neuron id":"sn"}, inplace=True)
 	e["setValue"] = e.index*0+5
+	e["setName"]  = "fafb"
 
 
 # short index sets: 3
@@ -31,18 +37,29 @@ except NameError:
 	a.rename(columns={"target neuron id":"tn"}, inplace=True)
 	a.rename(columns={"source neuron id":"sn"}, inplace=True)
 	a["setValue"]= a.index*0+1
+	a["setName"] = "manc"
 
 
 	b = pd.read_csv("../maol_1.1_edge_list.csv")
 	b.rename(columns={"target neuron id":"tn"}, inplace=True)
 	b.rename(columns={"source neuron id":"sn"}, inplace=True)
 	b["setValue"]= b.index*0+2
+	b["setName"] = "maol"
 
 
 	c = pd.read_csv("../mcns_0.9_edge_list.csv")
 	c.rename(columns={"target neuron id":"tn"}, inplace=True)
 	c.rename(columns={"source neuron id":"sn"}, inplace=True)
 	c["setValue"]= c.index*0+3
+	c["setName"] = "mcns"
+
+	dfs = {
+    '1': a,
+    '2': b,
+    '3': c,
+		'4': d,
+		'5': e
+	}
 
 	_initialized=True
 
@@ -112,9 +129,13 @@ def isolate_islands(matrix, rnode_index):
 ## need to return the island verteces referred to the original neuron index
 
 
-def islandingSingle():
+def islandingSingle( isetn ): # broken at the moment
 
-	return -1
+	df = dfs[str(isetn)]
+	mat, ni, rni = df_to_sparse(df, "sn", "tn" )
+	nset, niseq, Mcs = isolate_islands(mat, rni );
+
+	return nset, niseq, Mcs
 
 
 def isomorphismCheck():
@@ -143,8 +164,8 @@ mapping     = { val: i+1 for i, val in enumerate(unique_vals) }
 # dont actually need this
 L2["snX"] = -1;
 L2["tnX"] = -1;
-L2["snX"] = L2a["sn"].map(mapping)
-L2["tnX"] = L2a["tn"].map(mapping)
+L2["snX"] = L2["sn"].map(mapping)
+L2["tnX"] = L2["tn"].map(mapping)
 
 ##################### Approach 1
 mat, ni, rni = df_to_sparse(L2, "sn", "tn" )
