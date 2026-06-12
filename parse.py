@@ -83,10 +83,13 @@ def df_to_sparse(df, source_col, target_col):
     return matrix, node_index, rnode_index
 
 
-def isolate_islands(matrix, rnode_index):
+def isolate_islands(matrix, rnode_index, imode):
     """
     Takes a square connectivity matrix (dense, sparse lil/csr/csc, or list-of-lists).
     Returns a list of (node_indices) per island.
+
+		imode = 0 == return largest
+		imode = 1 == return all islands
     """
     # normalise any input type to csr
     if isinstance(matrix, lil_matrix):
@@ -107,42 +110,111 @@ def isolate_islands(matrix, rnode_index):
         islands.append([node_indices.tolist(), sub])
 
 # find the component id with the most nodes
-    comp_sizes = np.bincount(labels)
-    largest_id = np.argmax(comp_sizes)
-    node_indices = np.where(labels == largest_id)[0]
+    if( imode == 0 ):
+      comp_sizes = np.bincount(labels)
+      largest_id = np.argmax(comp_sizes)
+      node_indices = np.where(labels == largest_id)[0]
 
-    Mc = islands[largest_id][1];
+      Mc = islands[largest_id][1];
     #Mc = Mc + np.transpose(Mc) # connectivity matrix: symmetrized
 
     # neuron indixes 
-    nset = []
-    for key in node_indices:
-      nset.append( rnode_index[key] )
+      nset = []
+      for key in node_indices:
+        nset.append( rnode_index[key] )
 
+      return np.array(nset), node_indices, Mc
 
+    if( imode == 1 ):
+      return n_components, labels #islands
     #return n_components, labels
     #return nset
 		# returning neurons in the largest subgraph, sequential node indecies and connectivity Mat for the largest
 		# subset off sequential indecies
-    return np.array(nset), node_indices, Mc # islaislands, largest_id
 
 ## need to return the island verteces referred to the original neuron index
 
 
-def islandingSingle( isetn ): # broken at the moment
+#def islandingInFWdf( isetn, df, imode=1 ): # broken at the moment
+def islandingInFWdf( isetn, imode=1 ): # broken at the moment
 
-	df = dfs[str(isetn)]
-	mat, ni, rni = df_to_sparse(df, "sn", "tn" )
-	nset, niseq, Mcs = isolate_islands(mat, rni );
+  df = dfs[str(isetn)]
+  mat, ni, rni = df_to_sparse(df, "sn", "tn" )
+  islands = isolate_islands(mat, rni, imode=imode ); 
+  
+  return islands
+#	return nset, niseq, Mcs
 
-	return nset, niseq, Mcs
 
 
+def are_isomorphic(mat1, mat2):
+    """
+    Check structural equivalence of two directed graphs up to node relabeling.
+
+    Parameters
+    ----------
+    mat1, mat2 : lil_matrix, csr_matrix, or ndarray
+        Square directed connectivity matrices to compare.
+
+    Returns
+    -------
+    bool
+        True if graphs are structurally identical up to node relabeling.
+    dict or None
+        Node mapping {mat1 node -> mat2 node} if isomorphic, else None.
+    """
+    # normalise to dense numpy
+    if hasattr(mat1, 'toarray'): mat1 = mat1.toarray()
+    if hasattr(mat2, 'toarray'): mat2 = mat2.toarray()
+
+    # quick size check before expensive isomorphism test
+    if mat1.shape != mat2.shape:
+        return False, None
+
+    G1 = nx.from_numpy_array(mat1, create_using=nx.DiGraph)
+    G2 = nx.from_numpy_array(mat2, create_using=nx.DiGraph)
+
+    gm = nx.algorithms.isomorphism.DiGraphMatcher(G1, G2)
+    if gm.is_isomorphic():
+        mapping = list(gm.isomorphisms_iter())[0]
+        return True, mapping
+    return False, None
 
 
-def isomorphismCheck():
+def is_subgraph(small_mat, large_mat):
+    """
+    Check if small graph appears as an induced directed subgraph of large graph.
 
-	return -1
+    Parameters
+    ----------
+    small_mat : array-like or sparse
+        Connectivity matrix of the candidate subgraph.
+    large_mat : array-like or sparse
+        Connectivity matrix of the supergraph to search in.
+
+    Returns
+    -------
+    bool
+        True if small graph is an induced subgraph of large graph.
+    list of dicts
+        All mappings {large_node -> small_node} where match was found.
+    """
+    if hasattr(small_mat, 'toarray'): small_mat = small_mat.toarray()
+    if hasattr(large_mat, 'toarray'): large_mat = large_mat.toarray()
+
+    # quick check -- small must be smaller
+    if small_mat.shape[0] > large_mat.shape[0]:
+        return False, []
+
+    G_small = nx.from_numpy_array(small_mat, create_using=nx.DiGraph)
+    G_large = nx.from_numpy_array(large_mat, create_using=nx.DiGraph)
+
+    gm = nx.algorithms.isomorphism.DiGraphMatcher(G_large, G_small)
+
+    if gm.induced_subgraph_is_isomorphic():
+        mappings = list(gm.induced_subgraph_isomorphisms_iter())
+        return True, mappings
+    return False, []
 
 
 
@@ -170,8 +242,8 @@ L2["snX"] = L2["sn"].map(mapping)
 L2["tnX"] = L2["tn"].map(mapping)
 
 ##################### Approach 1
-mat, ni, rni = df_to_sparse(L2, "sn", "tn" )
-nset, niseq, Mcs = isolate_islands(mat, rni );
+matM, niM, rniM = df_to_sparse(L2, "sn", "tn" )
+nsetM, niseqM, McsM = isolate_islands(mat, rni, imode=0 );
 
 
 ### Approach 2: m* and f* repeats via isomorphism checks: only structure is guaranteed to be identical 

@@ -10,7 +10,7 @@ import networkx as nx
 import numpy as np
 
 
-from parse import df_to_sparse, isolate_islands
+from parse import df_to_sparse, isolate_islands, are_isomorphic
 
 
 mat1 = lil_matrix((8,8), dtype=int)
@@ -38,45 +38,12 @@ def pp( M ):
 def islandingSingleTest( df, sn, tn ): # broken at the moment
 
 	mat, ni, rni = df_to_sparse(df, sn, tn )
-	nset, niseq, Mcs = isolate_islands(mat, rni );
+	nset, niseq, Mcs = isolate_islands(mat, rni, imode=0 );
 
 	return nset, niseq, Mcs
 
 
-def are_isomorphic(mat1, mat2):
-    """
-    Check structural equivalence of two directed graphs up to node relabeling.
-
-    Parameters
-    ----------
-    mat1, mat2 : lil_matrix, csr_matrix, or ndarray
-        Square directed connectivity matrices to compare.
-
-    Returns
-    -------
-    bool
-        True if graphs are structurally identical up to node relabeling.
-    dict or None
-        Node mapping {mat1 node -> mat2 node} if isomorphic, else None.
-    """
-    # normalise to dense numpy
-    if hasattr(mat1, 'toarray'): mat1 = mat1.toarray()
-    if hasattr(mat2, 'toarray'): mat2 = mat2.toarray()
-
-    # quick size check before expensive isomorphism test
-    if mat1.shape != mat2.shape:
-        return False, None
-
-    G1 = nx.from_numpy_array(mat1, create_using=nx.DiGraph)
-    G2 = nx.from_numpy_array(mat2, create_using=nx.DiGraph)
-
-    gm = nx.algorithms.isomorphism.DiGraphMatcher(G1, G2)
-    if gm.is_isomorphic():
-        mapping = list(gm.isomorphisms_iter())[0]
-        return True, mapping
-    return False, None
-
-
+#############################
 i = 0
 for rowg1, rowg2 in zip(g1,g2):
 	print( rowg1 )
