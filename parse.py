@@ -9,8 +9,8 @@ import networkx as nx
 
 
 try:
-	#_initialized
-	_forceInit
+	_initialized
+	#_forceInit
 except NameError:
 
 	print("Init section: do once")
@@ -138,6 +138,8 @@ def islandingSingle( isetn ): # broken at the moment
 	return nset, niseq, Mcs
 
 
+
+
 def isomorphismCheck():
 
 	return -1
@@ -173,3 +175,17 @@ nset, niseq, Mcs = isolate_islands(mat, rni );
 
 
 ### Approach 2: m* and f* repeats via isomorphism checks: only structure is guaranteed to be identical 
+
+# build csr connectivity matrices
+
+
+try:
+	_buildConnectivityMANC
+	_forcebuildConnectivity
+except NameError:
+
+	#dfmanc = islandingSingle( 1 )
+	#df_to_sparse( df, 'sn', 'tn' )
+	#nset, niseq, Mcs, dfmanc = islandingSingle(1) 
+
+	_buildConnectivityMANC=True
